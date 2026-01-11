@@ -116,7 +116,7 @@ function corregirJalon(a) {
   if (a.esquena < 160) { errors.push("Esquena arquejada."); score -= 20; }
 
   if (score < 0) score = 0;
-  if (errors.length === 0) errors.push("ExecuciÃ³ correcta del jalÃ³n.");
+  if (errors.length === 0) errors.push("Execució correcta del jalón.");
 
   return { errors, score };
 }
@@ -130,7 +130,7 @@ function corregirSentadilla(a) {
   if (a.esquena < 160) { errors.push("Esquena corbada."); score -= 25; }
 
   if (score < 0) score = 0;
-  if (errors.length === 0) errors.push("ExecuciÃ³ correcta de la sentadilla.");
+  if (errors.length === 0) errors.push("Execució correcta de la sentadilla.");
 
   return { errors, score };
 }
@@ -143,7 +143,7 @@ function corregirRemo(a) {
   if (a.colze < 70) { errors.push("Recorregut curt de colze."); score -= 30; }
 
   if (score < 0) score = 0;
-  if (errors.length === 0) errors.push("ExecuciÃ³ correcta del remo.");
+  if (errors.length === 0) errors.push("Execució correcta del remo.");
 
   return { errors, score };
 }
@@ -156,7 +156,7 @@ function corregirPress(a) {
   if (a.esquena < 160) { errors.push("Arqueig excessiu."); score -= 30; }
 
   if (score < 0) score = 0;
-  if (errors.length === 0) errors.push("ExecuciÃ³ correcta del press banca.");
+  if (errors.length === 0) errors.push("Execució correcta del press banca.");
 
   return { errors, score };
 }
@@ -169,7 +169,7 @@ function corregirPesoMuerto(a) {
   if (a.maluc < 150) { errors.push("Maluc massa baix."); score -= 30; }
 
   if (score < 0) score = 0;
-  if (errors.length === 0) errors.push("ExecuciÃ³ correcta del peso muerto.");
+  if (errors.length === 0) errors.push("Execució correcta del peso muerto.");
 
   return { errors, score };
 }
@@ -179,13 +179,13 @@ function corregirPesoMuerto(a) {
 // -----------------------------
 function mostrarFeedback(resultat) {
   resultats.innerHTML = `
-    <p><strong>Puntuació³:</strong> ${resultat.score}/100</p>
+    <p><strong>Puntuació:</strong> ${resultat.score}/100</p>
     ${resultat.errors.map(e => `<p>${e}</p>`).join("")}
   `;
 }
 
 // -----------------------------
-// 8. FunciÃ³ per calcular angles
+// 8. Funció per calcular angles
 // -----------------------------
 function calculateAngle(a, b, c) {
   const AB = { x: a.x - b.x, y: a.y - b.y };
