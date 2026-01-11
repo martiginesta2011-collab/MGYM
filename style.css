@@ -1,0 +1,89 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    background: #0a0a0a;
+    color: #e5e5e5;
+    font-family: "Inter", system-ui, sans-serif;
+    max-width: 900px;
+    margin: auto;
+    padding: 20px;
+}
+
+header {
+    text-align: center;
+    margin-bottom: 25px;
+}
+
+.logo {
+    font-size: 3rem;
+    font-weight: 900;
+    letter-spacing: 2px;
+    color: #e5e5e5;
+}
+
+.logo span {
+    color: #e10600;
+}
+
+header p {
+    margin-top: 8px;
+    color: #b3b3b3;
+}
+
+.button {
+    display: inline-block;
+    background: #e10600;
+    color: #fff;
+    padding: 12px 22px;
+    border-radius: 6px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: 0.2s;
+}
+
+.button:hover {
+    background: #ff1a1a;
+    transform: translateY(-2px);
+}
+
+#videoInput {
+    display: none;
+}
+
+.video-section video {
+    width: 100%;
+    margin-top: 15px;
+    border-radius: 10px;
+    background: #1a1a1a;
+    border: 2px solid #e10600;
+}
+
+.output-section {
+    background: #1a1a1a;
+    padding: 15px;
+    border-radius: 10px;
+    border-left: 4px solid #e10600;
+    margin-top: 20px;
+}
+
+.output-section h2 {
+    margin-bottom: 10px;
+    color: #e10600;
+}
+
+#output {
+    white-space: pre-wrap;
+    font-family: monospace;
+    color: #d6d6d6;
+}
+
+footer {
+    text-align: center;
+    margin-top: 20px;
+    color: #777;
+    font-size: 0.85rem;
+}
