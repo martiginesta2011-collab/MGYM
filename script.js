@@ -179,7 +179,7 @@ function corregirPesoMuerto(a) {
 // -----------------------------
 function mostrarFeedback(resultat) {
   resultats.innerHTML = `
-    <p><strong>PuntuaciÃ³:</strong> ${resultat.score}/100</p>
+    <p><strong>Puntuació³:</strong> ${resultat.score}/100</p>
     ${resultat.errors.map(e => `<p>${e}</p>`).join("")}
   `;
 }
