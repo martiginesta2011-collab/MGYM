@@ -17,32 +17,40 @@ const feedbackEl = document.getElementById('feedback');
 let detector = null;
 let rafId = null;
 let running = false;
-let detectionInterval = 100; // ms entre inferencias
+let detectionInterval = 100;
 let lastDetection = 0;
 
-// Estado para conteo de sentadillas
-let squatState = 'top'; // 'top' | 'bottom'
+// Estado sentadillas
+let squatState = 'top';
 let squatReps = 0;
 
-// Ajustes/umbrales (puedes modificar)
+// Ajustes
 const SQUAT = {
-  kneeTop: 150,   // ángulo rodilla cuando está arriba (> = top)
-  kneeBottom: 100 // ángulo rodilla cuando está abajo (<= bottom)
+  kneeTop: 150,
+  kneeBottom: 100
 };
 const PLANK = {
-  torsoMinAngle: 160 // hombro-cadera-tobillo (cerca de 180 = recto)
+  torsoMinAngle: 160
 };
 
-// Conexiones para dibujar esqueleto (COCO-ish)
+// Conexiones esqueleto
 const connections = [
   [0,1],[0,2],[1,3],[2,4],
   [5,6],[5,7],[7,9],[6,8],[8,10],
   [11,12],[5,11],[6,12],[11,13],[13,15],[12,14],[14,16]
 ];
 
-// Cargar la cámara
+// ===============================
+// RESUMEN FINAL PRO – VARIABLES
+// ===============================
+let historialErrores = [];
+let historialAciertos = 0;
+let historialFrames = 0;
+
+// ===============================
+// CÁMARA
+// ===============================
 async function setupCamera(){
-  console.log('setupCamera: solicitando cámara');
   const stream = await navigator.mediaDevices.getUserMedia({
     audio:false,
     video:{facingMode:'user'}
@@ -50,26 +58,26 @@ async function setupCamera(){
   video.srcObject = stream;
   await video.play();
 
-  // ajustar canvas al video
   canvas.width = video.videoWidth;
   canvas.height = video.videoHeight;
   video.width = video.videoWidth;
   video.height = video.videoHeight;
-  console.log('setupCamera: cámara lista', video.videoWidth, video.videoHeight);
 }
 
-// Crear detector MoveNet
+// ===============================
+// MODELO MOVENET
+// ===============================
 async function createDetector(){
   statusEl.textContent = 'Cargando modelo...';
-  console.log('createDetector: cargando modelo MoveNet');
   const model = poseDetection.SupportedModels.MoveNet;
   const detectorConfig = {modelType: poseDetection.movenet.modelType.SINGLEPOSE_LIGHTNING};
   detector = await poseDetection.createDetector(model, detectorConfig);
   statusEl.textContent = 'Modelo cargado';
-  console.log('createDetector: detector listo');
 }
 
-// Calcular ángulo entre tres puntos A-B-C (B articulación central). Coordenadas en pixel.
+// ===============================
+// ÁNGULO ENTRE 3 PUNTOS
+// ===============================
 function angleBetween(A,B,C){
   const BAx = A.x - B.x, BAy = A.y - B.y;
   const BCx = C.x - B.x, BCy = C.y - B.y;
@@ -81,12 +89,15 @@ function angleBetween(A,B,C){
   return Math.acos(cos) * (180/Math.PI);
 }
 
-// Dibuja keypoints y líneas
+// ===============================
+// DIBUJAR POSE
+// ===============================
 function drawPose(keypoints){
   ctx.clearRect(0,0,canvas.width,canvas.height);
-  // Dibujar conexiones
+
   ctx.lineWidth = 2;
   ctx.strokeStyle = '#00C853';
+
   for(const [i,j] of connections){
     const a = keypoints[i], b = keypoints[j];
     if(a && b && a.score > 0.25 && b.score > 0.25){
@@ -97,10 +108,8 @@ function drawPose(keypoints){
     }
   }
 
-  // Dibujar puntos
   for(const p of keypoints){
-    if(!p) continue;
-    if(p.score > 0.25){
+    if(p && p.score > 0.25){
       ctx.beginPath();
       ctx.fillStyle = '#00C853';
       ctx.arc(p.x, p.y, 4, 0, Math.PI*2);
@@ -109,12 +118,13 @@ function drawPose(keypoints){
   }
 }
 
-// Obtener keypoint por nombre si existe (pose.keypoints tiene 'name' en MoveNet)
 function kpByName(keypoints, name){
   return keypoints.find(k=>k.name===name) || null;
 }
 
-// Procesar pose y calcular ángulos/feedback
+// ===============================
+// PROCESAR POSE
+// ===============================
 function processPose(pose){
   if(!pose || !pose.keypoints) return;
 
@@ -129,14 +139,12 @@ function processPose(pose){
   const leftAnkle = kpByName(k,'left_ankle');
   const rightAnkle = kpByName(k,'right_ankle');
 
-  // Calcular ángulos
   const leftKneeAngle = (leftHip && leftKnee && leftAnkle) ? angleBetween(leftHip,leftKnee,leftAnkle) : null;
   const rightKneeAngle = (rightHip && rightKnee && rightAnkle) ? angleBetween(rightHip,rightKnee,rightAnkle) : null;
 
   const leftHipAngle = (leftShoulder && leftHip && leftKnee) ? angleBetween(leftShoulder,leftHip,leftKnee) : null;
   const rightHipAngle = (rightShoulder && rightHip && rightKnee) ? angleBetween(rightShoulder,rightHip,rightKnee) : null;
 
-  // Torso angle for plank: shoulder - hip - ankle (average sides)
   let torsoAngle = null;
   if(leftShoulder && leftHip && leftAnkle){
     torsoAngle = angleBetween(leftShoulder,leftHip,leftAnkle);
@@ -144,64 +152,72 @@ function processPose(pose){
     torsoAngle = angleBetween(rightShoulder,rightHip,rightAnkle);
   }
 
-  // Actualizar UI de ángulos
   anglesEl.children[0].textContent = `Rodilla izq: ${leftKneeAngle ? leftKneeAngle.toFixed(0)+'°' : '—'}`;
   anglesEl.children[1].textContent = `Rodilla der: ${rightKneeAngle ? rightKneeAngle.toFixed(0)+'°' : '—'}`;
   anglesEl.children[2].textContent = `Cadera izq: ${leftHipAngle ? leftHipAngle.toFixed(0)+'°' : '—'}`;
   anglesEl.children[3].textContent = `Cadera der: ${rightHipAngle ? rightHipAngle.toFixed(0)+'°' : '—'}`;
   anglesEl.children[4].textContent = `Torso (plank): ${torsoAngle ? torsoAngle.toFixed(0)+'°' : '—'}`;
 
-  // Lógica por ejercicio
   const exercise = exerciseSelect.value;
+  let fb = [];
+
   if(exercise === 'squat'){
-    const kneeAvg = (() => {
-      if(leftKneeAngle && rightKneeAngle) return (leftKneeAngle + rightKneeAngle)/2;
-      return leftKneeAngle || rightKneeAngle || null;
-    })();
+    const kneeAvg = (leftKneeAngle && rightKneeAngle)
+      ? (leftKneeAngle + rightKneeAngle)/2
+      : (leftKneeAngle || rightKneeAngle || null);
 
     if(kneeAvg){
       if(squatState === 'top' && kneeAvg <= SQUAT.kneeBottom){
         squatState = 'bottom';
-        statusEl.textContent = 'Abajo (bottom)';
+        statusEl.textContent = 'Abajo';
       } else if(squatState === 'bottom' && kneeAvg >= SQUAT.kneeTop){
         squatState = 'top';
-        squatReps += 1;
+        squatReps++;
         repsEl.textContent = squatReps;
-        statusEl.textContent = 'Arriba (top)';
+        statusEl.textContent = 'Arriba';
       }
     }
 
-    let fb = [];
     if(kneeAvg){
-      if(kneeAvg > 160) fb.push('Extiende piernas completamente (arriba).');
+      if(kneeAvg > 160) fb.push('Extiende piernas completamente.');
       else if(kneeAvg < 80) fb.push('Profundidad alta — controla la espalda.');
     } else {
-      fb.push('Posición no detectada con suficiente confianza.');
+      fb.push('Posición no detectada.');
     }
 
-    const hipAvg = (leftHipAngle && rightHipAngle) ? (leftHipAngle + rightHipAngle)/2 : (leftHipAngle || rightHipAngle || null);
-    if(hipAvg && hipAvg < 70) fb.push('Flexión de cadera excesiva: cuida la espalda.');
+    const hipAvg = (leftHipAngle && rightHipAngle)
+      ? (leftHipAngle + rightHipAngle)/2
+      : (leftHipAngle || rightHipAngle || null);
 
-    feedbackEl.textContent = fb.join(' ');
+    if(hipAvg && hipAvg < 70) fb.push('Flexión de cadera excesiva.');
+
   } else if(exercise === 'plank'){
-    let fb = [];
     if(torsoAngle){
       if(torsoAngle >= PLANK.torsoMinAngle){
         statusEl.textContent = 'Buena línea';
-        fb.push('Mantén línea del cuerpo recta.');
       } else {
         statusEl.textContent = 'Cadera baja/alta';
-        fb.push('Ajusta la cadera para alinear hombros-cadera-tobillos.');
+        fb.push('Ajusta la cadera.');
       }
     } else {
-      statusEl.textContent = 'Posición no detectada';
-      fb.push('Acércate a la cámara y asegúrate de que se vean hombros, caderas y tobillos.');
+      fb.push('No se detecta torso.');
     }
-    feedbackEl.textContent = fb.join(' ');
+  }
+
+  feedbackEl.textContent = fb.join(' ');
+
+  // Registro PRO
+  historialFrames++;
+  if(fb.length > 0){
+    historialErrores.push(...fb);
+  } else {
+    historialAciertos++;
   }
 }
 
-// Loop principal: detectar y dibujar
+// ===============================
+// LOOP PRINCIPAL
+// ===============================
 async function renderLoop(){
   if(!running) return;
   const now = performance.now();
@@ -213,16 +229,23 @@ async function renderLoop(){
       if(pose) drawPose(pose.keypoints);
       processPose(pose);
     }catch(e){
-      console.error('Error en estimación de poses', e);
+      console.error('Error en estimación', e);
     }
   }
   rafId = requestAnimationFrame(renderLoop);
 }
 
-// Start / Stop lógica
-async function start(alert();){
+// ===============================
+// START / STOP
+// ===============================
+async function start(){
   startBtn.disabled = true;
   stopBtn.disabled = false;
+
+  historialErrores = [];
+  historialAciertos = 0;
+  historialFrames = 0;
+
   try{
     if(!video.srcObject){
       await setupCamera();
@@ -235,11 +258,10 @@ async function start(alert();){
     repsEl.textContent = '0';
     statusEl.textContent = 'En ejecución';
     lastDetection = 0;
-    console.log('start: iniciando bucle');
     renderLoop();
   }catch(err){
     console.error('Error al iniciar:', err);
-    statusEl.textContent = 'Error al iniciar, mira la consola';
+    statusEl.textContent = 'Error al iniciar';
     startBtn.disabled = false;
     stopBtn.disabled = true;
   }
@@ -250,20 +272,24 @@ function stop(){
   stopBtn.disabled = true;
   running = false;
   statusEl.textContent = 'Detenido';
+
   if(rafId) cancelAnimationFrame(rafId);
+
   if(video.srcObject){
     const tracks = video.srcObject.getTracks();
     tracks.forEach(t=>t.stop());
     video.srcObject = null;
   }
-  console.log('stop: detenido');
+
+  generarResumenFinal();
 }
 
-// Eventos UI
+// ===============================
+// EVENTOS
+// ===============================
 startBtn.addEventListener('click', ()=>{ start().catch(console.error); });
 stopBtn.addEventListener('click', stop);
 
-// ajustar canvas si cambia tamaño del video
 video.addEventListener('loadeddata', ()=>{
   if(video.videoWidth){
     canvas.width = video.videoWidth;
@@ -276,32 +302,11 @@ window.addEventListener('resize', ()=>{
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
   }
-});/* ============================
-   RESUMEN FINAL PRO – MGym’S
-   ============================ */
-
-// Variables globals per registrar estadístiques
-let historialErrores = [];
-let historialAciertos = 0;
-let historialFrames = 0;
-
-// Funció per registrar dades per frame
-function registrarEstadisticas(resultado) {
-    historialFrames++;
-
-    if (resultado.errors && resultado.errors.length > 0) {
-        historialErrores.push(...resultado.errors);
-    } else {
-        historialAciertos++;
-    }
-}
-
-// Detectar quan el vídeo acaba
-video.addEventListener("ended", () => {
-    generarResumenFinal();
 });
 
-// Funció principal del resum final
+// ===============================
+// RESUMEN FINAL PRO
+// ===============================
 function generarResumenFinal() {
     const totalErrores = historialErrores.length;
     const totalFrames = historialFrames;
@@ -309,49 +314,44 @@ function generarResumenFinal() {
         ? ((historialAciertos / totalFrames) * 100).toFixed(1)
         : 0;
 
-    // Comptar errors repetits
     const contador = {};
     historialErrores.forEach(err => {
         contador[err] = (contador[err] || 0) + 1;
     });
 
-    // Ordenar errors per freqüència
     const erroresOrdenados = Object.entries(contador)
         .sort((a, b) => b[1] - a[1])
-        .map(([error, veces]) => `• ${error} (${veces} vegades)`);
+        .map(([error, veces]) => `• ${error} (${veces} veces)`);
 
-    // Construir el resum final
     const resumen = `
-        <h3>Resum final del exercici</h3>
-        <p><strong>Puntuació global:</strong> ${porcentajeAcierto}/100</p>
-        <p><strong>Frames analitzats:</strong> ${totalFrames}</p>
-        <p><strong>Errors totals:</strong> ${totalErrores}</p>
+        <h3>Resumen final del ejercicio</h3>
+        <p><strong>Puntuación global:</strong> ${porcentajeAcierto}/100</p>
+        <p><strong>Frames analizados:</strong> ${totalFrames}</p>
+        <p><strong>Errores totales:</strong> ${totalErrores}</p>
 
-        <h4>Errors més freqüents:</h4>
-        ${erroresOrdenados.length > 0 ? erroresOrdenados.join("<br>") : "Cap error detectat"}
+        <h4>Errores más frecuentes:</h4>
+        ${erroresOrdenados.length > 0 ? erroresOrdenados.join("<br>") : "Ningún error detectado"}
 
-        <h4>Punts forts:</h4>
-        <p>${generarPuntsForts(porcentajeAcierto)}</p>
+        <h4>Puntos fuertes:</h4>
+        <p>${generarPuntosFuertes(porcentajeAcierto)}</p>
 
-        <h4>Recomanació final:</h4>
+        <h4>Recomendación final:</h4>
         <p>${generarRecomendacion(porcentajeAcierto)}</p>
     `;
 
-    document.getElementById("resultats").innerHTML = resumen;
+    feedbackEl.innerHTML = resumen;
 }
 
-// Text segons puntuació
-function generarPuntsForts(score) {
-    if (score > 85) return "Execució molt sòlida i estable.";
-    if (score > 70) return "Bona base tècnica amb petits detalls a millorar.";
-    if (score > 50) return "Tècnica acceptable però amb errors repetits.";
-    return "Cal reforçar la tècnica bàsica abans d’augmentar càrrega.";
+function generarPuntosFuertes(score) {
+    if (score > 85) return "Técnica muy sólida y estable.";
+    if (score > 70) return "Buena base técnica con detalles a mejorar.";
+    if (score > 50) return "Técnica aceptable pero con errores repetidos.";
+    return "Refuerza la técnica básica antes de aumentar carga.";
 }
 
-// Recomanació final segons puntuació
 function generarRecomendacion(score) {
-    if (score > 85) return "Mantén la tècnica i augmenta la càrrega de forma progressiva.";
-    if (score > 70) return "Ajusta petits detalls per millorar l’eficiència del moviment.";
-    if (score > 50) return "Controla la postura i el rang de moviment per evitar errors.";
-    return "Redueix la càrrega i centra’t en la tècnica fonamental.";
+    if (score > 85) return "Mantén la técnica y aumenta la carga progresivamente.";
+    if (score > 70) return "Ajusta pequeños detalles para mejorar la eficiencia.";
+    if (score > 50) return "Controla la postura y el rango de movimiento.";
+    return "Reduce la carga y céntrate en la técnica fundamental.";
 }
