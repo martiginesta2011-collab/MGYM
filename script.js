@@ -5,7 +5,7 @@ import {
 
 const videoInput = document.getElementById("videoInput");
 const video = document.getElementById("video");
-const resultats = document.getElementById("resultats");
+const resultsats = document.getElementById("resultsats");
 const exercici = document.getElementById("exercici");
 
 let poseLandmarker;
