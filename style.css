@@ -1,89 +1,80 @@
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-}
-
+/* FONS GENERAL */
 body {
-    background: #0a0a0a;
-    color: #e5e5e5;
-    font-family: "Inter", system-ui, sans-serif;
-    max-width: 900px;
-    margin: auto;
-    padding: 20px;
+  font-family: sans-serif;
+  margin: 0;
+  padding: 0;
+  background: #000;            /* Negre */
+  color: #00ff66;              /* Verd neó */
 }
 
+/* CAPÇALERA */
 header {
-    text-align: center;
-    margin-bottom: 25px;
-}
-
-.logo {
-    font-size: 3rem;
-    font-weight: 900;
-    letter-spacing: 2px;
-    color: #e5e5e5;
+  background: #00ff66;         /* Verd */
+  color: #000;                 /* Negre */
+  padding: 1em;
+  text-align: center;
 }
 
 .logo span {
-    color: #e10600;
+  color: #000;
 }
 
-header p {
-    margin-top: 8px;
-    color: #b3b3b3;
+/* SECCIONS */
+.upload-section, .video-section, .output-section {
+  margin: 2em;
 }
 
+/* BOTÓ PRINCIPAL */
 .button {
-    display: inline-block;
-    background: #e10600;
-    color: #fff;
-    padding: 12px 22px;
-    border-radius: 6px;
-    font-weight: 700;
-    cursor: pointer;
-    transition: 0.2s;
+  background: #00ff66;         /* Verd */
+  color: #000;                 /* Negre */
+  padding: 0.7em 1.2em;
+  border: none;
+  cursor: pointer;
+  display: inline-block;
+  margin-bottom: 1em;
+  font-weight: bold;
+  border-radius: 6px;
+  transition: 0.2s;
 }
 
 .button:hover {
-    background: #ff1a1a;
-    transform: translateY(-2px);
+  background: #00cc55;         /* Verd més fosc */
 }
 
-#videoInput {
-    display: none;
+/* SELECTOR D’EXERCICI */
+select {
+  background: #000;
+  color: #00ff66;
+  border: 2px solid #00ff66;
+  padding: 0.5em;
+  border-radius: 6px;
+  font-size: 1em;
 }
 
-.video-section video {
-    width: 100%;
-    margin-top: 15px;
-    border-radius: 10px;
-    background: #1a1a1a;
-    border: 2px solid #e10600;
+/* VÍDEO */
+video {
+  width: 100%;
+  max-width: 600px;
+  display: block;
+  margin: auto;
+  border: 3px solid #00ff66;
+  border-radius: 10px;
 }
 
-.output-section {
-    background: #1a1a1a;
-    padding: 15px;
-    border-radius: 10px;
-    border-left: 4px solid #e10600;
-    margin-top: 20px;
+/* RESULTATS */
+#resultats {
+  background: #111;            /* Negre suau */
+  padding: 1.5em;
+  border: 2px solid #00ff66;
+  border-radius: 10px;
+  font-size: 1.1em;
+  line-height: 1.5em;
 }
 
-.output-section h2 {
-    margin-bottom: 10px;
-    color: #e10600;
-}
-
-#output {
-    white-space: pre-wrap;
-    font-family: monospace;
-    color: #d6d6d6;
-}
-
-footer {
-    text-align: center;
-    margin-top: 20px;
-    color: #777;
-    font-size: 0.85rem;
+/* TÍTOLS */
+h2 {
+  color: #00ff66;
+  border-left: 5px solid #00ff66;
+  padding-left: 10px;
 }
