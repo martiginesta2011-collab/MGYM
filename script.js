@@ -1,4 +1,3 @@
-
 import {
   PoseLandmarker,
   FilesetResolver
@@ -6,7 +5,7 @@ import {
 
 const videoInput = document.getElementById("videoInput");
 const video = document.getElementById("video");
-const output = document.getElementById("output");
+const resultats = document.getElementById("resultats");
 
 let poseLandmarker;
 
@@ -33,13 +32,11 @@ initPose();
 // -----------------------------
 // 2. CARREGAR VÍDEO
 // -----------------------------
-videoInput.addEventListener("change", async function () {
-  const file = this.files[0];
+videoInput.addEventListener("change", () => {
+  const file = videoInput.files[0];
   if (!file) return;
 
-  const url = URL.createObjectURL(file);
-  video.src = url;
-
+  video.src = URL.createObjectURL(file);
   video.onloadedmetadata = () => {
     video.play();
     analyzeVideo();
@@ -49,20 +46,13 @@ videoInput.addEventListener("change", async function () {
 // -----------------------------
 // 3. ANALITZAR VÍDEO FRAME A FRAME
 // -----------------------------
-async function analyzeVideo() {
-  if (!poseLandmarker) {
-    output.textContent = "Carregant model...";
-    return;
-  }
-
-  const processFrame = () => {
+function analyzeVideo() {
+  const loop = () => {
     if (video.paused || video.ended) return;
 
     const results = poseLandmarker.detectForVideo(video, performance.now());
 
-    if (!results.landmarks || results.landmarks.length === 0) {
-      output.textContent = "No s'ha detectat cap persona.";
-    } else {
+    if (results.landmarks && results.landmarks.length > 0) {
       const lm = results.landmarks[0];
 
       // -----------------------------
@@ -76,68 +66,88 @@ async function analyzeVideo() {
       };
 
       // -----------------------------
-      // 5. CORRECCIÓ AUTOMÀTICA
+      // 5. CORRECCIÓ + SCORE
       // -----------------------------
-      const feedback = corregirAnglesJalon(angles);
-      mostrarFeedback(feedback);
+      const resultat = corregirJalon(angles);
+      mostrarFeedback(resultat);
     }
 
-    requestAnimationFrame(processFrame);
+    requestAnimationFrame(loop);
   };
 
-  requestAnimationFrame(processFrame);
+  requestAnimationFrame(loop);
 }
 
 // -----------------------------
-// 6. FUNCIÓ DE CORRECCIÓ JALÓN
+// 6. FUNCIÓ DE CORRECCIÓ + SCORE
 // -----------------------------
-function corregirAnglesJalon(angles) {
+function corregirJalon(a) {
   const errors = [];
+  let score = 100;
 
-  const colze = angles.colze;
-  const espatlla = angles.espatlla;
-  const esquena = angles.esquena;
-  const maluc = angles.maluc;
-
-  if (colze < 60) {
-    errors.push("Flexió de colze excessiva. Estàs tirant massa amb bíceps.");
+  if (a.colze < 60) {
+    errors.push("Flexió de colze excessiva. Estàs tirant amb bíceps.");
+    score -= 15;
   }
 
-  if (colze > 140) {
-    errors.push("Colzes massa oberts. Mantén-los lleugerament flexionats.");
+  if (a.colze > 140) {
+    errors.push("Colzes massa oberts. Mantén-los controlats.");
+    score -= 15;
   }
 
-  if (espatlla > 40) {
-    errors.push("Estàs pujant les espatlles. Depressa-les i activa dorsals.");
+  if (a.espatlla > 40) {
+    errors.push("Estàs pujant les espatlles. Depressa-les.");
+    score -= 15;
   }
 
-  if (esquena < 160) {
-    errors.push("Esquena arquejada. Mantén el tronc neutre i estable.");
+  if (a.esquena < 160) {
+    errors.push("Esquena arquejada. Mantén el tronc neutre.");
+    score -= 15;
   }
 
-  if (maluc < 165) {
+  if (a.maluc < 165) {
     errors.push("Estàs tirant el tronc enrere. Evita l’impuls.");
+    score -= 15;
   }
+
+  if (score < 0) score = 0;
 
   if (errors.length === 0) {
-    return ["Execució correcta. Bona tècnica en el jalón al pit."];
+    errors.push("Execució correcta. Bona tècnica.");
   }
 
-  return errors;
+  return { errors, score };
 }
 
 // -----------------------------
-// 7. MOSTRAR FEEDBACK A LA WEB
+// 7. MOSTRAR FEEDBACK + SCORE
 // -----------------------------
-function mostrarFeedback(llista) {
-  output.innerHTML = "";
+function mostrarFeedback(resultat) {
+  resultats.innerHTML = "";
 
-  llista.forEach(text => {
+  const scoreP = document.createElement("p");
+  scoreP.textContent = `Puntuació: ${resultat.score}/100`;
+  scoreP.style.fontWeight = "bold";
+  scoreP.style.fontSize = "18px";
+  resultats.appendChild(scoreP);
+
+  resultat.errors.forEach(t => {
     const p = document.createElement("p");
-    p.textContent = text;
-    output.appendChild(p);
+    p.textContent = t;
+    resultats.appendChild(p);
   });
 }
 
 // -----------------------------
-//
+// 8. FUNCIÓ PER CALCULAR ANGLES
+// -----------------------------
+function calculateAngle(a, b, c) {
+  const AB = { x: a.x - b.x, y: a.y - b.y };
+  const CB = { x: c.x - b.x, y: c.y - b.y };
+
+  const dot = AB.x * CB.x + AB.y * CB.y;
+  const magAB = Math.sqrt(AB.x ** 2 + AB.y ** 2);
+  const magCB = Math.sqrt(CB.x ** 2 + CB.y ** 2);
+
+  return Math.acos(dot / (magAB * magCB)) * (180 / Math.PI);
+}
