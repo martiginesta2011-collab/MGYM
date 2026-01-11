@@ -6,11 +6,12 @@ import {
 const videoInput = document.getElementById("videoInput");
 const video = document.getElementById("video");
 const resultats = document.getElementById("resultats");
+const exercici = document.getElementById("exercici");
 
 let poseLandmarker;
 
 // -----------------------------
-// 1. INICIALITZAR MEDIAPIPE
+// 1. Inicialitzar MediaPipe Tasks Vision
 // -----------------------------
 async function initPose() {
   const vision = await FilesetResolver.forVisionTasks(
@@ -25,12 +26,14 @@ async function initPose() {
     runningMode: "VIDEO",
     numPoses: 1
   });
+
+  console.log("PoseLandmarker carregat");
 }
 
 initPose();
 
 // -----------------------------
-// 2. CARREGAR VÍDEO
+// 2. Carregar vídeo
 // -----------------------------
 videoInput.addEventListener("change", () => {
   const file = videoInput.files[0];
@@ -44,11 +47,14 @@ videoInput.addEventListener("change", () => {
 });
 
 // -----------------------------
-// 3. ANALITZAR VÍDEO FRAME A FRAME
+// 3. Analitzar vídeo frame a frame
 // -----------------------------
 function analyzeVideo() {
   const loop = () => {
-    if (video.paused || video.ended) return;
+    if (video.paused || video.ended || !poseLandmarker) {
+      requestAnimationFrame(loop);
+      return;
+    }
 
     const results = poseLandmarker.detectForVideo(video, performance.now());
 
@@ -56,20 +62,26 @@ function analyzeVideo() {
       const lm = results.landmarks[0];
 
       // -----------------------------
-      // 4. CALCULAR ANGLES PER JALÓN
-      // -----------------------------
+      // 4. Calcular angles base
+      // (frontal, costat dret)
+// -----------------------------
       const angles = {
-        colze: calculateAngle(lm[12], lm[14], lm[16]),      // colze dret
-        espatlla: calculateAngle(lm[24], lm[12], lm[14]),  // espatlla dreta
-        esquena: calculateAngle(lm[12], lm[24], lm[26]),   // tronc
-        maluc: calculateAngle(lm[24], lm[26], lm[28])      // estabilitat
+        // Jalón / Press / Remo
+        colze: calculateAngle(lm[12], lm[14], lm[16]),        // espatlla dreta - colze dret - canell dret
+        espatlla: calculateAngle(lm[24], lm[12], lm[14]),     // maluc dret - espatlla dreta - colze dret
+
+        // Esquena / tronc (per tots)
+        esquena: calculateAngle(lm[12], lm[24], lm[26]),      // espatlla dreta - maluc dret - genoll dret
+
+        // Maluc / genoll (sentadilla, peso muerto)
+        maluc: calculateAngle(lm[24], lm[26], lm[28]),        // maluc dret - genoll dret - turmell dret
+        genoll: calculateAngle(lm[12], lm[24], lm[26])        // espatlla dreta - maluc dret - genoll dret
       };
 
-      // -----------------------------
-      // 5. CORRECCIÓ + SCORE
-      // -----------------------------
-      const resultat = corregirJalon(angles);
+      const resultat = corregir(angles);
       mostrarFeedback(resultat);
+    } else {
+      resultats.innerHTML = "<p>No s'ha detectat cap persona.</p>";
     }
 
     requestAnimationFrame(loop);
@@ -79,67 +91,163 @@ function analyzeVideo() {
 }
 
 // -----------------------------
-// 6. FUNCIÓ DE CORRECCIÓ + SCORE
+// 5. Motor universal de correcció
+// -----------------------------
+function corregir(angles) {
+  switch (exercici.value) {
+    case "jalon":
+      return corregirJalon(angles);
+    case "sentadilla":
+      return corregirSentadilla(angles);
+    case "remo":
+      return corregirRemo(angles);
+    case "press":
+      return corregirPress(angles);
+    case "pesoMuerto":
+      return corregirPesoMuerto(angles);
+    default:
+      return { errors: ["Exercici no reconegut."], score: 0 };
+  }
+}
+
+// -----------------------------
+// 6. Regles per a cada exercici
+// (versions simples però funcionals)
 // -----------------------------
 function corregirJalon(a) {
   const errors = [];
   let score = 100;
 
-  if (a.colze < 60) {
-    errors.push("Flexió de colze excessiva. Estàs tirant amb bíceps.");
-    score -= 15;
+  // Colze massa tancat (tirar massa de bíceps)
+  if (a.colze < 70) {
+    errors.push("Colze massa tancat. Estàs tirant massa amb bíceps.");
+    score -= 20;
   }
 
-  if (a.colze > 140) {
-    errors.push("Colzes massa oberts. Mantén-los controlats.");
-    score -= 15;
-  }
-
+  // Espatlla pujada
   if (a.espatlla > 40) {
-    errors.push("Estàs pujant les espatlles. Depressa-les.");
-    score -= 15;
+    errors.push("Estàs pujant les espatlles. Mantén-les avall.");
+    score -= 20;
   }
 
+  // Esquena arquejada
   if (a.esquena < 160) {
-    errors.push("Esquena arquejada. Mantén el tronc neutre.");
-    score -= 15;
-  }
-
-  if (a.maluc < 165) {
-    errors.push("Estàs tirant el tronc enrere. Evita l’impuls.");
-    score -= 15;
+    errors.push("Esquena massa arquejada. Mantén el tronc neutre.");
+    score -= 20;
   }
 
   if (score < 0) score = 0;
+  if (errors.length === 0) errors.push("Execució correcta del jalón.");
 
-  if (errors.length === 0) {
-    errors.push("Execució correcta. Bona tècnica.");
+  return { errors, score };
+}
+
+function corregirSentadilla(a) {
+  const errors = [];
+  let score = 100;
+
+  // Profunditat (maluc)
+  if (a.maluc > 120) {
+    errors.push("Baixes poc a la sentadilla. Intenta arribar més avall.");
+    score -= 25;
   }
+
+  // Genoll molt avançat / alineació
+  if (a.genoll < 150) {
+    errors.push("Controla la posició del genoll. Evita plegar-te massa endavant.");
+    score -= 25;
+  }
+
+  // Esquena
+  if (a.esquena < 160) {
+    errors.push("Esquena corbada a la sentadilla. Mantén l'esquena més neutra.");
+    score -= 25;
+  }
+
+  if (score < 0) score = 0;
+  if (errors.length === 0) errors.push("Execució correcta de la sentadilla.");
+
+  return { errors, score };
+}
+
+function corregirRemo(a) {
+  const errors = [];
+  let score = 100;
+
+  // Esquena
+  if (a.esquena < 165) {
+    errors.push("Esquena massa corbada al remo. Mantén el tronc ferm.");
+    score -= 30;
+  }
+
+  // Colze
+  if (a.colze < 70) {
+    errors.push("Recorregut curt de colze al remo. Estira més enrere.");
+    score -= 30;
+  }
+
+  if (score < 0) score = 0;
+  if (errors.length === 0) errors.push("Execució correcta del remo.");
+
+  return { errors, score };
+}
+
+function corregirPress(a) {
+  const errors = [];
+  let score = 100;
+
+  // Colzes molt oberts
+  if (a.colze > 140) {
+    errors.push("Colzes massa oberts al press. Tanca una mica per protegir espatlles.");
+    score -= 30;
+  }
+
+  // Esquena exageradament arquejada
+  if (a.esquena < 160) {
+    errors.push("Arqueig excessiu de l'esquena al press.");
+    score -= 30;
+  }
+
+  if (score < 0) score = 0;
+  if (errors.length === 0) errors.push("Execució correcta del press banca.");
+
+  return { errors, score };
+}
+
+function corregirPesoMuerto(a) {
+  const errors = [];
+  let score = 100;
+
+  // Esquena
+  if (a.esquena < 170) {
+    errors.push("Esquena corbada al peso muerto. Mantén la columna més neutra.");
+    score -= 30;
+  }
+
+  // Maluc (punt de partida massa baix)
+  if (a.maluc < 150) {
+    errors.push("Estàs baixant massa el maluc al peso muerto. No ho converteixis en sentadilla.");
+    score -= 30;
+  }
+
+  if (score < 0) score = 0;
+  if (errors.length === 0) errors.push("Execució correcta del peso muerto.");
 
   return { errors, score };
 }
 
 // -----------------------------
-// 7. MOSTRAR FEEDBACK + SCORE
+// 7. Mostrar feedback
 // -----------------------------
 function mostrarFeedback(resultat) {
-  resultats.innerHTML = "";
-
-  const scoreP = document.createElement("p");
-  scoreP.textContent = `Puntuació: ${resultat.score}/100`;
-  scoreP.style.fontWeight = "bold";
-  scoreP.style.fontSize = "18px";
-  resultats.appendChild(scoreP);
-
-  resultat.errors.forEach(t => {
-    const p = document.createElement("p");
-    p.textContent = t;
-    resultats.appendChild(p);
-  });
+  resultats.innerHTML = `
+    <p><strong>Puntuació:</strong> ${resultat.score}/100</p>
+    ${resultat.errors.map(e => `<p>${e}</p>`).join("")}
+  `;
 }
 
 // -----------------------------
-// 8. FUNCIÓ PER CALCULAR ANGLES
+// 8. Funció per calcular angles
 // -----------------------------
 function calculateAngle(a, b, c) {
   const AB = { x: a.x - b.x, y: a.y - b.y };
@@ -149,5 +257,7 @@ function calculateAngle(a, b, c) {
   const magAB = Math.sqrt(AB.x ** 2 + AB.y ** 2);
   const magCB = Math.sqrt(CB.x ** 2 + CB.y ** 2);
 
-  return Math.acos(dot / (magAB * magCB)) * (180 / Math.PI);
+  const cos = dot / (magAB * magCB);
+  const clamped = Math.min(Math.max(cos, -1), 1); // evitar NaN
+  return Math.acos(clamped) * (180 / Math.PI);
 }
