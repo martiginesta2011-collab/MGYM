@@ -1,46 +1,44 @@
 <!DOCTYPE html>
 <html lang="ca">
 <head>
-    <meta charset="UTF-8">
-    <title>MGym’S – AI Coach</title>
-    <link rel="stylesheet" href="style.css">
-
-    <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#e10600">
-
-    <script>
-      if ("serviceWorker" in navigator) {
-        window.addEventListener("load", () => {
-          navigator.serviceWorker.register("service-worker.js");
-        });
-      }
-    </script>
+  <meta charset="UTF-8">
+  <title>MGym’S – AI Coach</title>
+  <link rel="stylesheet" href="style.css">
+  <meta name="theme-color" content="#e10600">
 </head>
 <body>
 
 <header>
-    <h1 class="logo">M<span>Gym’S</span></h1>
-    <p>Correcció de tècnica amb intel·ligència artificial</p>
+  <h1 class="logo">M<span>Gym’S</span></h1>
+  <p>Correcció de tècnica amb intel·ligència artificial</p>
 </header>
 
 <main>
-    <section class="upload-section">
-        <label for="videoInput" class="button">Puja un vídeo</label>
-        <input type="file" id="videoInput" accept="video/*">
-    </section>
+  <section class="upload-section">
+    <label for="videoInput" class="button">Selecciona un arxiu</label>
+    <input type="file" id="videoInput" accept="video/*">
 
-    <section class="video-section">
-        <video id="video" controls playsinline></video>
-    </section>
+    <select id="exercici">
+      <option value="jalon">Jalón al pit</option>
+      <option value="sentadilla">Sentadilla</option>
+      <option value="remo">Remo amb barra</option>
+      <option value="press">Press banca</option>
+      <option value="pesoMuerto">Peso muerto</option>
+    </select>
+  </section>
 
-    <section class="output-section">
-        <h2>Resultats</h2>
-        <div id="resultats"></div>
-    </section>
+  <section class="video-section">
+    <video id="video" controls playsinline></video>
+  </section>
+
+  <section class="output-section">
+    <h2>Resultats</h2>
+    <div id="resultats"></div>
+  </section>
 </main>
 
 <footer>
-    <p></p>
+  <p></p>
 </footer>
 
 <script type="module" src="script.js"></script>
