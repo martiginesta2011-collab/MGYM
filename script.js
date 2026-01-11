@@ -12,10 +12,11 @@ videoInput.addEventListener("change", function () {
     const url = URL.createObjectURL(file);
     video.src = url;
 
-    video.addEventListener("loadeddata", () => {
+    // iPad-friendly event
+    video.onloadedmetadata = () => {
         video.play();
         startAnalysis();
-    }, { once: true });
+    };
 });
 
 function startAnalysis() {
@@ -49,7 +50,10 @@ function startAnalysis() {
 }
 
 function onResults(results) {
-    if (!results.poseLandmarks) return;
+    if (!results.poseLandmarks) {
+        output.textContent = "No s'ha detectat cap persona.";
+        return;
+    }
 
     const lm = results.poseLandmarks;
 
