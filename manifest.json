@@ -1,0 +1,9 @@
+{
+  "name": "MGym’S – AI Coach",
+  "short_name": "MGym’S",
+  "start_url": "index.html",
+  "display": "standalone",
+  "background_color": "#0a0a0a",
+  "theme_color": "#e10600",
+  "icons": []
+}
