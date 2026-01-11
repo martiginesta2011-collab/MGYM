@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+    <meta charset="UTF-8">
+    <title>MGym’S – AI Coach</title>
+    <link rel="stylesheet" href="style.css">
+
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#e10600">
+
+    <script>
+      if ("serviceWorker" in navigator) {
+        window.addEventListener("load", () => {
+          navigator.serviceWorker.register("service-worker.js");
+        });
+      }
+    </script>
+
+    <!-- MediaPipe -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5/pose.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+</head>
+<body>
+
+<header>
+    <h1 class="logo">M<span>Gym’S</span></h1>
+    <p>Correcció de tècnica amb intel·ligència artificial</p>
+</header>
+
+<main>
+    <section class="upload-section">
+        <label for="videoInput" class="button">Puja un vídeo</label>
+        <input type="file" id="videoInput" accept="video/*">
+    </section>
+
+    <section class="video-section">
+        <video id="video" controls playsinline></video>
+    </section>
+
+    <section class="output-section">
+        <h2>Resultats</h2>
+        <pre id="output">Puja un vídeo per començar.</pre>
+    </section>
+</main>
+
+<footer>
+    <p>Copia els angles i enganxa’ls a Copilot per rebre correccions.</p>
+</footer>
+
+<script src="script.js"></script>
+</body>
+</html>
