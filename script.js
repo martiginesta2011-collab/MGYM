@@ -10,12 +10,9 @@ const exercici = document.getElementById("exercici");
 
 let poseLandmarker;
 
-// ===============================
-// RESUMEN FINAL PRO – VARIABLES
-// ===============================
-let historialErrores = [];
-let historialAciertos = 0;
-let historialFrames = 0;
+// ======== PRO: Historial ========
+let scoreFrames = [];
+let errorTagsCount = {};
 
 // -----------------------------
 // 1. Inicialitzar MediaPipe Tasks Vision
@@ -46,20 +43,26 @@ videoInput.addEventListener("change", () => {
   const file = videoInput.files[0];
   if (!file) return;
 
-  // Reiniciar estadístiques PRO
-  historialErrores = [];
-  historialAciertos = 0;
-  historialFrames = 0;
+  // Reiniciar PRO
+  scoreFrames = [];
+  errorTagsCount = {};
 
   video.src = URL.createObjectURL(file);
+  video.muted = true;
+  video.playsInline = true;
+
   video.onloadedmetadata = () => {
-    video.play();
-    analyzeVideo();
+    video.play().catch(err => console.error("Error play:", err));
+
+    video.onplay = () => {
+      video.width = video.videoWidth;
+      video.height = video.videoHeight;
+      analyzeVideo();
+    };
   };
 
-  // Quan el vídeo acabi → RESUM FINAL PRO
   video.onended = () => {
-    generarResumenFinal();
+    generarResumenFinalPro();
   };
 });
 
@@ -89,15 +92,12 @@ function analyzeVideo() {
       const resultat = corregir(angles);
       mostrarFeedback(resultat);
 
-      // ===============================
-      // REGISTRE PRO PER FRAME
-      // ===============================
-      historialFrames++;
-      if (resultat.errors.length > 0 && !resultat.errors[0].includes("Execució correcta")) {
-        historialErrores.push(...resultat.errors);
-      } else {
-        historialAciertos++;
-      }
+      // ======== PRO: Registrar dades ========
+      scoreFrames.push(resultat.score);
+      const tags = classificarErrors(resultat.errors);
+      tags.forEach(tag => {
+        errorTagsCount[tag] = (errorTagsCount[tag] || 0) + 1;
+      });
 
     } else {
       resultats.innerHTML = "<p>No s'ha detectat cap persona.</p>";
@@ -110,92 +110,106 @@ function analyzeVideo() {
 }
 
 // -----------------------------
-// 5. Motor universal de correcció
+// 4. Motor universal de correcció
 // -----------------------------
 function corregir(angles) {
   switch (exercici.value) {
-    case "jalon":
-      return corregirJalon(angles);
-    case "sentadilla":
-      return corregirSentadilla(angles);
-    case "remo":
-      return corregirRemo(angles);
-    case "press":
-      return corregirPress(angles);
-    case "pesoMuerto":
-      return corregirPesoMuerto(angles);
-    default:
-      return { errors: ["Exercici no reconegut."], score: 0 };
+    case "jalon": return corregirJalon(angles);
+    case "sentadilla": return corregirSentadilla(angles);
+    case "remo": return corregirRemo(angles);
+    case "press": return corregirPress(angles);
+    case "pesoMuerto": return corregirPesoMuerto(angles);
+    default: return { errors: ["Exercici no reconegut."], score: 0 };
   }
 }
 
 // -----------------------------
-// 6. Regles per a cada exercici
+// 5. Classificador PRO de patrons biomecànics
 // -----------------------------
+function classificarErrors(errors) {
+  const tags = [];
+  errors.forEach(e => {
+    const t = e.toLowerCase();
+
+    if (t.includes("esquena") && t.includes("corbada")) tags.push("columna_no_neutra");
+    if (t.includes("arqueig")) tags.push("hiperextensio_lumbar");
+    if (t.includes("colze") && t.includes("tancat")) tags.push("colze_tancat");
+    if (t.includes("colzes massa oberts")) tags.push("colzes_oberts_press");
+    if (t.includes("genoll massa endavant")) tags.push("genoll_endavant");
+    if (t.includes("baixes poc")) tags.push("poca_profunditat");
+    if (t.includes("maluc massa baix")) tags.push("maluc_baix");
+  });
+  return tags;
+}
+
+// -----------------------------
+// 6. Regles PRO realistes per exercici
+// -----------------------------
+
+// Jalón
 function corregirJalon(a) {
   const errors = [];
   let score = 100;
 
-  if (a.colze < 70) { errors.push("Colze massa tancat."); score -= 20; }
-  if (a.espatlla > 40) { errors.push("Espatlla pujada."); score -= 20; }
-  if (a.esquena < 160) { errors.push("Esquena arquejada."); score -= 20; }
+  if (a.colze < 50) { errors.push("Colze massa tancat."); score -= 5; }
+  if (a.espatlla > 45) { errors.push("Espatlla pujada."); score -= 10; }
+  if (a.esquena < 145) { errors.push("Esquena arquejada."); score -= 15; }
 
   if (score < 0) score = 0;
   if (errors.length === 0) errors.push("Execució correcta del jalón.");
-
   return { errors, score };
 }
 
+// Sentadilla
 function corregirSentadilla(a) {
   const errors = [];
   let score = 100;
 
-  if (a.maluc > 120) { errors.push("Baixes poc."); score -= 25; }
-  if (a.genoll < 150) { errors.push("Genoll massa endavant."); score -= 25; }
-  if (a.esquena < 160) { errors.push("Esquena corbada."); score -= 25; }
+  if (a.maluc > 130) { errors.push("Baixes poc."); score -= 10; }
+  if (a.genoll < 130) { errors.push("Genoll massa endavant."); score -= 5; }
+  if (a.esquena < 145) { errors.push("Esquena corbada."); score -= 15; }
 
   if (score < 0) score = 0;
   if (errors.length === 0) errors.push("Execució correcta de la sentadilla.");
-
   return { errors, score };
 }
 
+// Remo
 function corregirRemo(a) {
   const errors = [];
   let score = 100;
 
-  if (a.esquena < 165) { errors.push("Esquena corbada."); score -= 30; }
-  if (a.colze < 70) { errors.push("Recorregut curt de colze."); score -= 30; }
+  if (a.esquena < 150) { errors.push("Esquena corbada."); score -= 15; }
+  if (a.colze < 50) { errors.push("Recorregut curt de colze."); score -= 5; }
 
   if (score < 0) score = 0;
   if (errors.length === 0) errors.push("Execució correcta del remo.");
-
   return { errors, score };
 }
 
+// Press banca
 function corregirPress(a) {
   const errors = [];
   let score = 100;
 
-  if (a.colze > 140) { errors.push("Colzes massa oberts."); score -= 30; }
-  if (a.esquena < 160) { errors.push("Arqueig excessiu."); score -= 30; }
+  if (a.colze > 150) { errors.push("Colzes massa oberts."); score -= 10; }
+  if (a.esquena < 145) { errors.push("Arqueig excessiu."); score -= 15; }
 
   if (score < 0) score = 0;
   if (errors.length === 0) errors.push("Execució correcta del press banca.");
-
   return { errors, score };
 }
 
+// Peso muerto
 function corregirPesoMuerto(a) {
   const errors = [];
   let score = 100;
 
-  if (a.esquena < 170) { errors.push("Esquena corbada."); score -= 30; }
-  if (a.maluc < 150) { errors.push("Maluc massa baix."); score -= 30; }
+  if (a.esquena < 150) { errors.push("Esquena corbada."); score -= 15; }
+  if (a.maluc < 140) { errors.push("Maluc massa baix."); score -= 10; }
 
   if (score < 0) score = 0;
   if (errors.length === 0) errors.push("Execució correcta del peso muerto.");
-
   return { errors, score };
 }
 
@@ -204,13 +218,13 @@ function corregirPesoMuerto(a) {
 // -----------------------------
 function mostrarFeedback(resultat) {
   resultats.innerHTML = `
-    <p><strong>Puntuació:</strong> ${resultat.score}/100</p>
+    <p><strong>Puntuació instantània:</strong> ${resultat.score}/100</p>
     ${resultat.errors.map(e => `<p>${e}</p>`).join("")}
   `;
 }
 
 // -----------------------------
-// 8. Funció per calcular angles
+// 8. Càlcul angles
 // -----------------------------
 function calculateAngle(a, b, c) {
   const AB = { x: a.x - b.x, y: a.y - b.y };
@@ -226,54 +240,83 @@ function calculateAngle(a, b, c) {
   return Math.acos(clamped) * (180 / Math.PI);
 }
 
-// ===============================
-// 9. RESUM FINAL PRO
-// ===============================
-function generarResumenFinal() {
-  const totalErrores = historialErrores.length;
-  const totalFrames = historialFrames;
-  const porcentajeAcierto = totalFrames > 0
-    ? ((historialAciertos / totalFrames) * 100).toFixed(1)
-    : 0;
+// -----------------------------
+// 9. RESUM FINAL PRO (mitjana ponderada)
+// -----------------------------
+function generarResumenFinalPro() {
+  if (scoreFrames.length === 0) {
+    resultats.innerHTML += "<p>No hi ha prou dades per generar un resum.</p>";
+    return;
+  }
 
-  const contador = {};
-  historialErrores.forEach(err => {
-    contador[err] = (contador[err] || 0) + 1;
-  });
+  const ordenades = [...scoreFrames].sort((a, b) => a - b);
+  const n = ordenades.length;
+  const tall = Math.floor(n * 0.05);
 
-  const erroresOrdenados = Object.entries(contador)
-    .sort((a, b) => b[1] - a[1])
-    .map(([error, veces]) => `• ${error} (${veces} vegades)`);
+  const centrals = ordenades.slice(tall, n - tall);
 
-  const resumen = `
-    <h3>Resum final del exercici</h3>
-    <p><strong>Puntuació global:</strong> ${porcentajeAcierto}/100</p>
-    <p><strong>Frames analitzats:</strong> ${totalFrames}</p>
-    <p><strong>Errors totals:</strong> ${totalErrores}</p>
+  const suma = centrals.reduce((acc, s) => acc + s, 0);
+  const mitjana = (suma / centrals.length).toFixed(1);
 
-    <h4>Errors més freqüents:</h4>
-    ${erroresOrdenados.length > 0 ? erroresOrdenados.join("<br>") : "Cap error detectat"}
+  const patronsOrdenats = Object.entries(errorTagsCount)
+    .sort((a, b) => b[1] - a[1]);
 
-    <h4>Punts forts:</h4>
-    <p>${generarPuntsForts(porcentajeAcierto)}</p>
+  const rectificacio = generarRectificacioPro(patronsOrdenats, mitjana);
 
-    <h4>Recomanació final:</h4>
-    <p>${generarRecomendacion(porcentajeAcierto)}</p>
+  resultats.innerHTML += `
+    <hr>
+    <h3>Resum PRO de l'exercici</h3>
+    <p><strong>Nota global (ponderada):</strong> ${mitjana}/100</p>
+    <p><strong>Frames analitzats:</strong> ${scoreFrames.length}</p>
+    <h4>Correcció tècnica</h4>
+    ${rectificacio}
   `;
-
-  resultats.innerHTML = resumen;
 }
 
-function generarPuntsForts(score) {
-  if (score > 85) return "Execució molt sòlida i estable.";
-  if (score > 70) return "Bona base tècnica amb petits detalls a millorar.";
-  if (score > 50) return "Tècnica acceptable però amb errors repetits.";
-  return "Cal reforçar la tècnica bàsica abans d’augmentar càrrega.";
-}
+// -----------------------------
+// 10. Text biomecànic PRO
+// -----------------------------
+function generarRectificacioPro(patronsOrdenats, mitjana) {
+  const blocs = [];
 
-function generarRecomendacion(score) {
-  if (score > 85) return "Mantén la tècnica i augmenta la càrrega de forma progressiva.";
-  if (score > 70) return "Ajusta petits detalls per millorar l’eficiència del moviment.";
-  if (score > 50) return "Controla la postura i el rang de moviment.";
-  return "Redueix la càrrega i centra’t en la tècnica fonamental.";
+  if (mitjana >= 85) blocs.push("<p>Execució eficient i estable. Pots afinar trajectòries i ritme.</p>");
+  else if (mitjana >= 70) blocs.push("<p>Bona base tècnica, però hi ha patrons a corregir.</p>");
+  else if (mitjana >= 50) blocs.push("<p>Tècnica inconsistent. Cal reforçar punts clau.</p>");
+  else blocs.push("<p>Prioritza estabilitat i control abans d'augmentar càrrega.</p>");
+
+  for (const [tag] of patronsOrdenats) {
+
+    if (tag === "columna_no_neutra") blocs.push(`
+      <p><strong>Columna no neutra:</strong> Mantén activació abdominal i pensa en créixer en altura.</p>
+    `);
+
+    if (tag === "hiperextensio_lumbar") blocs.push(`
+      <p><strong>Hiperextensió lumbar:</strong> Evita treure pit exageradament. Costelles sobre pelvis.</p>
+    `);
+
+    if (tag === "colze_tancat") blocs.push(`
+      <p><strong>Colze massa tancat:</strong> Obre lleugerament el colze per millorar la línia de tracció.</p>
+    `);
+
+    if (tag === "colzes_oberts_press") blocs.push(`
+      <p><strong>Colzes massa oberts:</strong> Mantén-los a 45–60° per protegir l'espatlla.</p>
+    `);
+
+    if (tag === "genoll_endavant") blocs.push(`
+      <p><strong>Genoll massa endavant:</strong> Reparteix càrrega entre maluc i genoll.</p>
+    `);
+
+    if (tag === "poca_profunditat") blocs.push(`
+      <p><strong>Poca profunditat:</strong> Treballa mobilitat de maluc i turmell.</p>
+    `);
+
+    if (tag === "maluc_baix") blocs.push(`
+      <p><strong>Maluc massa baix:</strong> Eleva lleugerament el maluc i mantén la barra a prop del cos.</p>
+    `);
+  }
+
+  if (patronsOrdenats.length === 0)
+    blocs.push("<p>No s'han detectat errors clars. Bona execució global.</p>");
+
+  return blocs.join("");
 }
