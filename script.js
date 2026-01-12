@@ -1,6 +1,3 @@
-Aquí tens el **fitxer complet ja modificat amb la versió PRO**, llest per substituir l’actual.
-
-```js
 import {
   PoseLandmarker,
   FilesetResolver
@@ -13,9 +10,12 @@ const exercici = document.getElementById("exercici");
 
 let poseLandmarker;
 
-// ======== PRO: Historial ========
-let scoreFrames = [];
-let errorTagsCount = {};
+// ===============================
+// RESUMEN FINAL PRO – VARIABLES
+// ===============================
+let historialErrores = [];
+let historialAciertos = 0;
+let historialFrames = 0;
 
 // -----------------------------
 // 1. Inicialitzar MediaPipe Tasks Vision
@@ -46,9 +46,10 @@ videoInput.addEventListener("change", () => {
   const file = videoInput.files[0];
   if (!file) return;
 
-  // Reiniciar PRO
-  scoreFrames = [];
-  errorTagsCount = {};
+  // Reiniciar estadístiques PRO
+  historialErrores = [];
+  historialAciertos = 0;
+  historialFrames = 0;
 
   video.src = URL.createObjectURL(file);
   video.onloadedmetadata = () => {
@@ -56,9 +57,9 @@ videoInput.addEventListener("change", () => {
     analyzeVideo();
   };
 
-  // Quan acabe el vídeo → resum PRO
+  // Quan el vídeo acabi → RESUM FINAL PRO
   video.onended = () => {
-    generarResumenFinalPro();
+    generarResumenFinal();
   };
 });
 
@@ -77,9 +78,6 @@ function analyzeVideo() {
     if (results.landmarks && results.landmarks.length > 0) {
       const lm = results.landmarks[0];
 
-      // -----------------------------
-      // 4. Calcular angles base
-      // -----------------------------
       const angles = {
         colze: calculateAngle(lm[12], lm[14], lm[16]),
         espatlla: calculateAngle(lm[24], lm[12], lm[14]),
@@ -91,12 +89,15 @@ function analyzeVideo() {
       const resultat = corregir(angles);
       mostrarFeedback(resultat);
 
-      // ======== PRO: Registrar dades ========
-      scoreFrames.push(resultat.score);
-      const tags = classificarErrors(resultat.errors);
-      tags.forEach(tag => {
-        errorTagsCount[tag] = (errorTagsCount[tag] || 0) + 1;
-      });
+      // ===============================
+      // REGISTRE PRO PER FRAME
+      // ===============================
+      historialFrames++;
+      if (resultat.errors.length > 0 && !resultat.errors[0].includes("Execució correcta")) {
+        historialErrores.push(...resultat.errors);
+      } else {
+        historialAciertos++;
+      }
 
     } else {
       resultats.innerHTML = "<p>No s'ha detectat cap persona.</p>";
@@ -126,39 +127,6 @@ function corregir(angles) {
     default:
       return { errors: ["Exercici no reconegut."], score: 0 };
   }
-}
-
-// ======== PRO: Classificar errors en patrons ========
-function classificarErrors(errors) {
-  const tags = [];
-
-  errors.forEach(e => {
-    const t = e.toLowerCase();
-
-    if (t.includes("esquena") && t.includes("corbada")) {
-      tags.push("columna_no_neutra");
-    }
-    if (t.includes("arquejada")) {
-      tags.push("hiperextensio_lumbar");
-    }
-    if (t.includes("colze") && (t.includes("tancat") || t.includes("curt"))) {
-      tags.push("rang_recorregut_limitat");
-    }
-    if (t.includes("colzes massa oberts")) {
-      tags.push("colzes_oberts_press");
-    }
-    if (t.includes("genoll massa endavant")) {
-      tags.push("genoll_endavant_sentadilla");
-    }
-    if (t.includes("baixes poc")) {
-      tags.push("poca_profunditat_sentadilla");
-    }
-    if (t.includes("maluc massa baix")) {
-      tags.push("maluc_baix_peso_muerto");
-    }
-  });
-
-  return tags;
 }
 
 // -----------------------------
@@ -236,7 +204,7 @@ function corregirPesoMuerto(a) {
 // -----------------------------
 function mostrarFeedback(resultat) {
   resultats.innerHTML = `
-    <p><strong>Puntuació (instantània):</strong> ${resultat.score}/100</p>
+    <p><strong>Puntuació:</strong> ${resultat.score}/100</p>
     ${resultat.errors.map(e => `<p>${e}</p>`).join("")}
   `;
 }
@@ -261,109 +229,51 @@ function calculateAngle(a, b, c) {
 // ===============================
 // 9. RESUM FINAL PRO
 // ===============================
-function generarResumenFinalPro() {
-  if (scoreFrames.length === 0) {
-    resultats.innerHTML += "<p>No hi ha prou dades per generar un resum.</p>";
-    return;
-  }
+function generarResumenFinal() {
+  const totalErrores = historialErrores.length;
+  const totalFrames = historialFrames;
+  const porcentajeAcierto = totalFrames > 0
+    ? ((historialAciertos / totalFrames) * 100).toFixed(1)
+    : 0;
 
-  const suma = scoreFrames.reduce((acc, s) => acc + s, 0);
-  const mitjana = (suma / scoreFrames.length).toFixed(1);
+  const contador = {};
+  historialErrores.forEach(err => {
+    contador[err] = (contador[err] || 0) + 1;
+  });
 
-  const patronsOrdenats = Object.entries(errorTagsCount)
-    .sort((a, b) => b[1] - a[1]);
+  const erroresOrdenados = Object.entries(contador)
+    .sort((a, b) => b[1] - a[1])
+    .map(([error, veces]) => `• ${error} (${veces} vegades)`);
 
-  const rectificacio = generarRectificacioPro(patronsOrdenats, mitjana);
+  const resumen = `
+    <h3>Resum final del exercici</h3>
+    <p><strong>Puntuació global:</strong> ${porcentajeAcierto}/100</p>
+    <p><strong>Frames analitzats:</strong> ${totalFrames}</p>
+    <p><strong>Errors totals:</strong> ${totalErrores}</p>
 
-  const html = `
-    <hr>
-    <h3>Resum PRO de l'exercici</h3>
-    <p><strong>Nota global (mitjana):</strong> ${mitjana}/100</p>
-    <p><strong>Frames analitzats:</strong> ${scoreFrames.length}</p>
+    <h4>Errors més freqüents:</h4>
+    ${erroresOrdenados.length > 0 ? erroresOrdenados.join("<br>") : "Cap error detectat"}
 
-    <h4>Correcció tècnica</h4>
-    ${rectificacio}
+    <h4>Punts forts:</h4>
+    <p>${generarPuntsForts(porcentajeAcierto)}</p>
+
+    <h4>Recomanació final:</h4>
+    <p>${generarRecomendacion(porcentajeAcierto)}</p>
   `;
 
-  resultats.innerHTML += html;
+  resultats.innerHTML = resumen;
 }
 
-// ===============================
-// 10. Text biomecànic avançat
-// ===============================
-function generarRectificacioPro(patronsOrdenats, mitjana) {
-  const blocs = [];
-
-  // Comentari general segons nota
-  if (mitjana >= 85) {
-    blocs.push("<p>Execució globalment eficient. Pots afinar trajectòries i control del ritme per maximitzar la transferència.</p>");
-  } else if (mitjana >= 70) {
-    blocs.push("<p>Bona base tècnica, però hi ha patrons d'error que limiten l'eficiència del moviment.</p>");
-  } else if (mitjana >= 50) {
-    blocs.push("<p>Tècnica inconsistent. Cal corregir punts clau per millorar seguretat i rendiment.</p>");
-  } else {
-    blocs.push("<p>La prioritat és establir una tècnica sòlida abans d'augmentar càrrega o intensitat.</p>");
-  }
-
-  // Comentaris específics per patrons
-  for (const [tag, count] of patronsOrdenats) {
-
-    if (tag === "columna_no_neutra") {
-      blocs.push(`
-        <p><strong>Columna no neutra:</strong> Mantén una lleugera activació abdominal i pensa en “créixer en altura”. 
-        Evita flexions innecessàries que carreguen la zona lumbar.</p>
-      `);
-    }
-
-    if (tag === "hiperextensio_lumbar") {
-      blocs.push(`
-        <p><strong>Hiperextensió lumbar:</strong> No exageris el “treure pit”. 
-        Mantén costelles apilades sobre la pelvis i activa glutis per estabilitzar.</p>
-      `);
-    }
-
-    if (tag === "rang_recorregut_limitat") {
-      blocs.push(`
-        <p><strong>Rang de recorregut curt:</strong> Prioritza un ROM complet i controlat. 
-        Redueix pes si cal per garantir un estímul muscular òptim.</p>
-      `);
-    }
-
-    if (tag === "colzes_oberts_press") {
-      blocs.push(`
-        <p><strong>Colzes massa oberts al press:</strong> Porta els colzes a 45–60° respecte al tronc. 
-        Millora l'alineació d’espatlla i redueix estrès articular.</p>
-      `);
-    }
-
-    if (tag === "genoll_endavant_sentadilla") {
-      blocs.push(`
-        <p><strong>Genoll massa endavant:</strong> Reparteix càrrega entre maluc i genoll. 
-        Mantén el pes sobre tot el peu i pensa en “asseure't enrere”.</p>
-      `);
-    }
-
-    if (tag === "poca_profunditat_sentadilla") {
-      blocs.push(`
-        <p><strong>Poca profunditat:</strong> Treballa mobilitat de maluc i turmell. 
-        Utilitza alçadors de taló si cal per aconseguir una profunditat funcional.</p>
-      `);
-    }
-
-    if (tag === "maluc_baix_peso_muerto") {
-      blocs.push(`
-        <p><strong>Maluc massa baix al peso muerto:</strong> Eleva lleugerament el maluc i mantén la barra a prop del cos. 
-        Activa isquios i glutis per una tracció més eficient.</p>
-      `);
-    }
-  }
-
-  if (patronsOrdenats.length === 0) {
-    blocs.push("<p>No s'han detectat errors clars. Pots afinar ritme, respiració i control excèntric.</p>");
-  }
-
-  return blocs.join("");
+function generarPuntsForts(score) {
+  if (score > 85) return "Execució molt sòlida i estable.";
+  if (score > 70) return "Bona base tècnica amb petits detalls a millorar.";
+  if (score > 50) return "Tècnica acceptable però amb errors repetits.";
+  return "Cal reforçar la tècnica bàsica abans d’augmentar càrrega.";
 }
-```
 
-Si després de substituir tot això veus algun comportament estrany (per exemple, no es mostra el resum al final), digues-m’ho i mirem només la part concreta que falla.
+function generarRecomendacion(score) {
+  if (score > 85) return "Mantén la tècnica i augmenta la càrrega de forma progressiva.";
+  if (score > 70) return "Ajusta petits detalls per millorar l’eficiència del moviment.";
+  if (score > 50) return "Controla la postura i el rang de moviment.";
+  return "Redueix la càrrega i centra’t en la tècnica fonamental.";
+}
